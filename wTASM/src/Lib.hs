@@ -6,7 +6,7 @@
 module Lib where
 
 import Prelude as P
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, catMaybes)
 import Control.Monad (guard)
 
 import Math.Geometry.Grid.Square
@@ -39,8 +39,12 @@ emptyTile = Flat Nothing Nothing
 
 --data Board g t = GridMap g (FloorType t)
 
+-- board :: Math.Geometry.GridMap.Lazy.LGridMap Math.Geometry.Grid.SquareInternal.RectSquareGrid (FloorType (Tile Integer))
+
 board' = lazyGridMap (rectSquareGrid 3 3) (repeat emptyTile)
 board = insert (1,1) (Wedge North (Just (T 0 1 0 1)))  board'
+
+testTiles = [T 0 1 0 1]
 --neighbors b i = neighbors
 
 neighVals b i = P.map (b !) (Grid.neighbours b i)
@@ -127,3 +131,46 @@ updateBoard j ntile b = adjust placeTile j b
          placeTile (Flat Nothing Nothing) = Flat Nothing (Just ntile)
          placeTile (Flat Nothing x) = Flat (Just ntile) x
          placeTile x = x
+
+
+--step :: (Eq a) =>
+--  gm (FloorType (Tile a))
+--     -- -> [Math.Geometry.GridInternal.Index (gm (FloorType (Tile a)))]
+--     -> [Grid.Index RectSquareGrid]
+--     -> [Tile a]
+--     -> [([gm (FloorType (Tile a))],
+--          [Grid.Index RectSquareGrid])]
+step board bndry t = do
+   i <- bndry 
+   dir <- [North, East, West, South]
+   let res = updateInDir dir i board t
+   guard (not (P.null res))
+   let mneigh = Grid.neighbour board i dir
+   let nbndry = maybe bndry (\neigh -> neigh:bndry) mneigh --delete <*> mneigh (pure bndry)
+   let nbdry' = P.filter (/= i) nbndry
+   --return (res, Grid.neighbour board i dir)
+   return (res,nbdry') -- delete i nbndry)
+ 
+-- simulate :: (Eq a) =>
+--    gm (FloorType (Tile a))
+--    --- -> [Math.Geometry.GridInternal.Index (gm (FloorType (Tile a)))]
+--    -> [Grid.Index RectSquareGrid]
+--    -> [Tile a]
+--    -> Int
+--    -> [gm (FloorType (Tile a))]
+simulate board bndry t 0 = [board]
+simulate board bndry t n = do
+   let res = step board bndry t
+   (nboards, nbndry) <- res
+   nboard <- nboards
+   ----let (boards, mbndries) = unzip res
+   --let res' = P.map maybeHelp res
+   --let res'' = catMaybes res'
+   --(nboards, nbndry) <- res''
+   --nboard <- nboards
+   --let (boards, bnds) = unzip res''
+   simulate nboard nbndry t (n-1)
+
+
+maybeHelp (a, Just b) = Just (a,b)
+maybeHelp (a, Nothing) = Nothing
