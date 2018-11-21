@@ -165,19 +165,27 @@ nullHelp b a  = a
 
 --step board [] t = [([board],[])]   
 --Need to change to folding around the boundry, not mapping over it.
-step board bndry t = do
-   i <- bndry 
-   (boards,bndrs) <- updateBoardAround i  board t
-   let bndrs' = catMaybes bndrs
-   let nbndrs = union bndry bndrs'
-   --let nbndrs = delete i nbndrs'
+step board [] nbndry t = [([board],nbndry)]
+step board (i:bndry) nbndry t = do
+   (boards, mbndrpts) <- updateBoardAround i board t
+   let bndry' = catMaybes mbndrpts
+   let nbndry' = union nbndry bndry'
+   board <- boards
+   step board bndry nbndry' t
+   ----i <- bndry 
+   --(boards,bndrs) <- updateBoardAround i board t
+   --let bndrs' = catMaybes bndrs
+   --let nbndrs = union bndry bndrs'
+   ----let nbndrs = delete i nbndrs'
+   --return (boards, nbndrs)
 
-   return (boards, nbndrs)
+--step takes the board and boundry, 
+--going around the boundry, it updates the board at that poinnt
 
 simulate board bndry t 0 = [board]
 simulate board [] t n = [board]
 simulate board bndry t n = do
-   let res = step board bndry t
+   let res = step board bndry [] t
    (nboards, nbndry) <- res
    nboard <- nboards
    simulate nboard nbndry t (n-1)
