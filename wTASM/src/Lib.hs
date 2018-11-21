@@ -7,6 +7,8 @@ module Lib where
 
 import Prelude as P
 import Data.Maybe (maybeToList, catMaybes)
+import Data.List (union)
+import Data.List.Extra (nubOrd)
 import Control.Monad (guard)
 
 import Math.Geometry.Grid.Square
@@ -15,6 +17,8 @@ import Math.Geometry.GridMap as GMap
 import Math.Geometry.GridMap.Lazy
 import qualified Math.Geometry.Grid as Grid
 --import Data.Map  
+
+import Debug.Trace
 
 someFunc :: IO ()
 someFunc = putStrLn "someFunc"
@@ -117,6 +121,7 @@ tilesDeterministic tileSet = all (\(d,s) -> isOneOrNone (caniditeTiles d s tileS
 --   (cord,tile) <- bndry
 
 --updateInDir :: SquareDirection -> (Int,Int) -> LGridMap RectSquareGrid (FloorType (Tile t)) -> [Tile t] -> [LGridMap RectSquareGrid (FloorType (Tile t))]
+--Could have bug of Flat A B, Flat N N -> Flat N A instead of Flat N B
 updateInDir d i b t = do
    let source = b ! i
    sourceTile <- getTiles source
@@ -132,43 +137,49 @@ updateBoard j ntile b = adjust placeTile j b
          placeTile (Flat Nothing x) = Flat (Just ntile) x
          placeTile x = x
 
+updateBoardAround j board t = do -- P.foldl (updateInDir') [board] [North, East, South, West]
+   let bndr = []
 
---step :: (Eq a) =>
---  gm (FloorType (Tile a))
---     -- -> [Math.Geometry.GridInternal.Index (gm (FloorType (Tile a)))]
---     -> [Grid.Index RectSquareGrid]
---     -> [Tile a]
---     -> [([gm (FloorType (Tile a))],
---          [Grid.Index RectSquareGrid])]
+   let nboards = updateInDir North j board t
+   let bndr' = if not (null nboards) then (Grid.neighbour board j North):bndr else bndr
+   let nboards' = nullHelp board nboards
+   nboard <- nboards'
+
+   let eboards = updateInDir East j nboard t
+   let bndr'' = if not (null eboards) then (Grid.neighbour board j East):bndr' else bndr'
+   let eboards' = nullHelp nboard eboards
+   eboard <- eboards'
+
+   let sboards = updateInDir South j eboard t
+   let bndr''' = if not (null sboards) then (Grid.neighbour board j South):bndr'' else bndr''
+   let sboards' = nullHelp eboard sboards
+   sboard <- sboards'
+
+   let wboards = updateInDir West j sboard t
+   let bndr4 = if not (null wboards) then (Grid.neighbour board j West):bndr''' else bndr'''
+   let wboards' = nullHelp sboard wboards
+   return (wboards',bndr4)
+
+nullHelp b []  = [b]
+nullHelp b a  = a
+
+--step board [] t = [([board],[])]   
+--Need to change to folding around the boundry, not mapping over it.
 step board bndry t = do
    i <- bndry 
-   dir <- [North, East, West, South]
-   let res = updateInDir dir i board t
-   guard (not (P.null res))
-   let mneigh = Grid.neighbour board i dir
-   let nbndry = maybe bndry (\neigh -> neigh:bndry) mneigh --delete <*> mneigh (pure bndry)
-   let nbdry' = P.filter (/= i) nbndry
-   --return (res, Grid.neighbour board i dir)
-   return (res,nbdry') -- delete i nbndry)
- 
--- simulate :: (Eq a) =>
---    gm (FloorType (Tile a))
---    --- -> [Math.Geometry.GridInternal.Index (gm (FloorType (Tile a)))]
---    -> [Grid.Index RectSquareGrid]
---    -> [Tile a]
---    -> Int
---    -> [gm (FloorType (Tile a))]
+   (boards,bndrs) <- updateBoardAround i  board t
+   let bndrs' = catMaybes bndrs
+   let nbndrs = union bndry bndrs'
+   --let nbndrs = delete i nbndrs'
+
+   return (boards, nbndrs)
+
 simulate board bndry t 0 = [board]
+simulate board [] t n = [board]
 simulate board bndry t n = do
    let res = step board bndry t
    (nboards, nbndry) <- res
    nboard <- nboards
-   ----let (boards, mbndries) = unzip res
-   --let res' = P.map maybeHelp res
-   --let res'' = catMaybes res'
-   --(nboards, nbndry) <- res''
-   --nboard <- nboards
-   --let (boards, bnds) = unzip res''
    simulate nboard nbndry t (n-1)
 
 
