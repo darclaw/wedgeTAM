@@ -7,9 +7,11 @@ module Lib where
 
 import Prelude as P
 import Data.Maybe (maybeToList, catMaybes)
-import Data.List (union)
+import Data.List (union, elemIndex)
 import Data.List.Extra (nubOrd)
 import Control.Monad (guard)
+
+import Data.Char
 
 import Math.Geometry.Grid.Square
 import Math.Geometry.Grid.SquareInternal
@@ -29,6 +31,7 @@ f .> g = g f
 data FloorType t = Flat (Maybe t) (Maybe t)
                    -- | Wedge (Grid.Direction g) (Maybe t)
                    | Wedge (SquareDirection) (Maybe t)
+                   --Wedge south is on layer 0 is the north and 1 in the south
                    deriving (Show)
 --deriving instance Show (FloorType SquareDirection Int)
 
@@ -47,6 +50,23 @@ emptyTile = Flat Nothing Nothing
 
 board' = lazyGridMap (rectSquareGrid 3 3) (repeat emptyTile)
 board = insert (1,1) (Wedge North (Just (T 0 1 0 1)))  board'
+
+
+holyBoard' = lazyGridMap (rectSquareGrid 7 6) (repeat emptyTile)
+            .> insertHelp holyBoardS (Wedge North Nothing)
+            .> insertHelp holyBoardW (Wedge East Nothing)
+            .> insertHelp holyBoardN (Wedge South Nothing)
+            .> insertHelp holyBoardE (Wedge West Nothing)
+            .> insert (3,3) (Wedge South Nothing) 
+   where holyBoardS = [(2,1),(3,1)]
+         holyBoardW = [(1,2),(1,3),(1,4)]
+         holyBoardN = [(2,5),(3,5)]
+         holyBoardE = [(4,2),(4,3),(4,4)]
+         insertHelp [] ft board = board
+         insertHelp (p:ps) ft board = insertHelp ps ft (insert p ft board)
+
+holyBoardOut = insert (0,0) (Flat Nothing (Just (T 0 1 0 1))) holyBoard'
+holyBoardIn = insert (2,2) (Flat Nothing (Just (T 0 1 0 1))) holyBoard'
 
 testTiles = [T 0 1 0 1]
 --neighbors b i = neighbors
@@ -67,42 +87,43 @@ directedNeighAll b i d = (allInfoFrom b i) <$> Grid.neighbour b i d
 -- compatible (Wedge _ _) (Flat Nothing (Just _)) = True
 -- compatible (Flat _ _) (Flat Nothing Nothing) = True
 -- compatible (Flat (Just _) _) (Flat Nothing (Just _)) = True
+
 -- compatible dir source target
-compatible _ (Flat _ _) (Flat _ Nothing) = True
-compatible _ (Flat _ (Just _)) (Flat Nothing (Just _)) = True
-compatible North (Flat _ _) (Wedge North Nothing) = True
-compatible North (Wedge North _) (Flat Nothing (Just _)) = True
-compatible North (Wedge North _) (Wedge South Nothing) = True
-compatible North (Wedge South _) (Wedge North Nothing) = True
-compatible North (Wedge South _) (Flat Nothing  Nothing) = True
-compatible North (Flat _ (Just _)) (Wedge South Nothing) = True
+compatible _ (Flat _ (Just _)) (Flat _ Nothing) = True
+compatible _ (Flat (Just _) (Just _)) (Flat Nothing (Just _)) = True
+compatible North (Flat _ (Just _)) (Wedge North Nothing) = True
+compatible North (Wedge North (Just _)) (Flat Nothing (Just _)) = True
+compatible North (Wedge North (Just _)) (Wedge South Nothing) = True
+compatible North (Wedge South (Just _)) (Wedge North Nothing) = True
+compatible North (Wedge South (Just _)) (Flat Nothing  Nothing) = True
+compatible North (Flat (Just _) (Just _)) (Wedge South Nothing) = True
 
 compatible East (Flat _ _) (Wedge East Nothing) = True
 compatible East (Wedge East _) (Flat Nothing (Just _)) = True
 compatible East (Wedge East _) (Wedge West Nothing) = True
 compatible East (Wedge West _) (Wedge East Nothing) = True
 compatible East (Wedge West _) (Flat Nothing  Nothing) = True
-compatible East (Flat _ (Just _)) (Wedge West Nothing) = True
+compatible East (Flat (Just _) (Just _)) (Wedge West Nothing) = True
 
 compatible South (Flat _ _) (Wedge South Nothing) = True
 compatible South (Wedge South _) (Flat Nothing (Just _)) = True
 compatible South (Wedge South _) (Wedge North Nothing) = True
 compatible South (Wedge North _) (Wedge South Nothing) = True
 compatible South (Wedge North _) (Flat Nothing  Nothing) = True
-compatible South (Flat _ (Just _)) (Wedge North Nothing) = True
+compatible South (Flat (Just _) (Just _)) (Wedge North Nothing) = True
 
 compatible West (Flat _ _) (Wedge West Nothing) = True
 compatible West (Wedge West _) (Flat Nothing (Just _)) = True
 compatible West (Wedge West _) (Wedge East Nothing) = True
 compatible West (Wedge East _) (Wedge West Nothing) = True
 compatible West (Wedge East _) (Flat Nothing  Nothing) = True
-compatible West (Flat _ (Just _)) (Wedge East Nothing) = True
+compatible West (Flat (Just _) (Just _)) (Wedge East Nothing) = True
 
 compatible _ _ _ = False
 
 
 data Tile t = T t t t t
-            deriving (Show)
+            deriving (Show, Eq)
 
 --sticks dir source targe
 sticks North (T x _ _ _) (T _ _ y _) = x==y
@@ -193,3 +214,33 @@ simulate board bndry t n = do
 
 maybeHelp (a, Just b) = Just (a,b)
 maybeHelp (a, Nothing) = Nothing
+
+prettyShow t mx my board = do
+   y <- [(my-1),(my-2)..0]
+   let row' = do x <- [0..(mx-1)]
+                 let ft = board ! (x,y)
+                 prettifyFT ft t
+   let row = row' ++("\n")
+   row
+
+
+prettifyFT (Flat Nothing Nothing) t = "_  "
+prettifyFT (Flat Nothing (Just x)) t = "_ "++(getTileNum x t)
+prettifyFT (Flat (Just x) Nothing) t = "Ets"
+prettifyFT (Flat (Just x) (Just y)) t = "_"++(getTileNum x t)++(getTileNum y t)
+
+prettifyFT (Wedge North Nothing) t = "∧  "
+prettifyFT (Wedge North (Just x)) t = "∧ "++(getTileNum x t)
+prettifyFT (Wedge West Nothing) t = "<  "
+prettifyFT (Wedge West (Just x)) t = "< "++(getTileNum x t)
+prettifyFT (Wedge South Nothing) t = "∨  "
+prettifyFT (Wedge South (Just x)) t = "∨ "++(getTileNum x t)
+prettifyFT (Wedge East Nothing) t = ">  "
+prettifyFT (Wedge East (Just x)) t = "> "++(getTileNum x t)
+
+
+getTileNum x t = case elemIndex x t of
+                   Just n ->  [chr (n+67)]
+                   Nothing -> "n"
+
+prettyPutHeadBoard t mx my boards = putStr $ prettyShow t mx my $ head boards
