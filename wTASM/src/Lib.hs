@@ -240,7 +240,7 @@ prettifyFT (Wedge East (Just x)) t = "> "++(getTileNum x t)
 
 
 getTileNum x t = case elemIndex x t of
-                   Just n ->  [chr (n+67)]
+                   Just n ->  [chr (n+65)]
                    Nothing -> "n"
 
 prettyPutHeadBoard t mx my boards = putStr $ prettyShow t mx my $ head boards
