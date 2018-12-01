@@ -160,26 +160,43 @@ updateBoard j ntile b = adjust placeTile j b
 
 updateBoardAround j board t = do -- P.foldl (updateInDir') [board] [North, East, South, West]
    let bndr = []
+   let curFT = board ! j
 
    let nboards = updateInDir North j board t
-   let bndr' = if not (null nboards) then (Grid.neighbour board j North):bndr else bndr
+   let mnneigh = Grid.neighbour board j North
+   let mnFT = (board !)<$> mnneigh
+   let bndr' = if (not (null nboards)) || (activatableWedge North curFT mnFT) then mnneigh:bndr else bndr
    let nboards' = nullHelp board nboards
    nboard <- nboards'
 
    let eboards = updateInDir East j nboard t
-   let bndr'' = if not (null eboards) then (Grid.neighbour board j East):bndr' else bndr'
+   let meneigh = Grid.neighbour board j East 
+   let meFT = (board !)<$> meneigh
+   let bndr'' = if not (null eboards) || (activatableWedge East curFT meFT) then meneigh:bndr' else bndr'
    let eboards' = nullHelp nboard eboards
    eboard <- eboards'
 
    let sboards = updateInDir South j eboard t
-   let bndr''' = if not (null sboards) then (Grid.neighbour board j South):bndr'' else bndr''
+   let msneigh = Grid.neighbour board j South 
+   let msFT = (board !)<$> msneigh
+   let bndr''' = if not (null sboards) || (activatableWedge South curFT msFT) then msneigh:bndr'' else bndr''
    let sboards' = nullHelp eboard sboards
    sboard <- sboards'
 
    let wboards = updateInDir West j sboard t
-   let bndr4 = if not (null wboards) then (Grid.neighbour board j West):bndr''' else bndr'''
+   let mwneigh = Grid.neighbour board j West 
+   let mwFT = (board !)<$> mwneigh
+   let bndr4 = if not (null wboards) || (activatableWedge West curFT mwFT) then mwneigh:bndr''' else bndr'''
    let wboards' = nullHelp sboard wboards
    return (wboards',bndr4)
+   where activatableWedge North (Flat Nothing (Just _)) (Just (Wedge South (Just _))) = True
+         activatableWedge East (Flat Nothing (Just _)) (Just (Wedge West (Just _))) = True
+         activatableWedge South (Flat Nothing (Just _)) (Just (Wedge North (Just _))) = True
+         activatableWedge West (Flat Nothing (Just _)) (Just (Wedge East (Just _))) = True
+         activatableWedge _ _ _ = False
+
+
+--activatableWedge j board dir = False
 
 nullHelp b []  = [b]
 nullHelp b a  = a
